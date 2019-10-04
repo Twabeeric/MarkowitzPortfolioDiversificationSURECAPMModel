@@ -1,7 +1,5 @@
 ---
 title: "Group Assignment"
-author: "Ali-Can Oztan,Samuel Roth,Junho Kim,Andrew Fish, Eric Ontieri"
-date: "November 30th, 2017"
 output: html_document
 ---
 
