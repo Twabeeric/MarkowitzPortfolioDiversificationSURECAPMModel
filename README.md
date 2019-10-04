@@ -134,6 +134,7 @@ twentyfiveport
 
  [1] "KO"   "INTC" "MCD"  "MRK"  "DIS"  "XOM"  "AXP"  "PG"   "UNH"  "MSFT"
 [11] "JPM"  "IBM"  "HD"   "V"    "GS"   "WBA"  "VZ"   "CVX"  "UTX"  "DWDP"
+
 [21] "CSCO" "CAT"  "WMT"  "NKE"  "MMM"
 
 thirtyport
