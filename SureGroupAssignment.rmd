@@ -1,0 +1,126 @@
+---
+title: "Group Assignment"
+author: "Ali-Can Oztan,Samuel Roth,Junho Kim,Andrew Fish, Eric Ontieri"
+date: "November 30th, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This project helps you observe the principle of diversification in action. Diversification means that the portfolio risk can be reduced by investing in a variety of assets.
+1. Select 30 stocks that you are interested in. Find their yahoo symbols. This
+website can help you find the symbols that yahoo is using http://investexcel.net/
+all-yahoo-finance-stock-tickers/. Remember to double check the symbols at yahoo
+finance.
+```{r}
+library(quantmod)
+library(m537)
+library(m537tools)
+library(XML)
+library(RCurl)
+library(rlist)
+thedowurl=getURL("https://finance.yahoo.com/quote/%5EDJI/components?p=%5EDJI")
+djicomp =readHTMLTable(thedowurl)
+dowdf=djicomp[[1]]
+dowsymbolist=dowdf[,1]
+downames=dowdf[,2]
+dowsymbolist
+```
+2. Download 4 years of weekly price data for each stock from June 1, 2014 to June 1, 2018. Remember this requires that all 30 stocks you select in step 1 should be available for these 4 years.
+```{r}
+datadf=getfinwdat(symbols = c(as.character(dowsymbolist), "^gspc"), symnames = c(as.character(dowsymbolist), "sp500"), from = "2014-06-01", to = "2018-06-01")
+rskfree = getrskfree(from = "2014-06-01", to = "2018-06-01")
+head(datadf)
+```
+3. Select a desired portfolio mean return level.
+```{r}
+desr=(.1)/52
+```
+4. Now form 6 portfolios. Each portfolio has 5, 10, 15, 20, 25 and 30 stocks. The smallercset of assets should be a subset of the larger set. For example, if you have IBM in the set of 5 stocks, you must include IBM in the portfolios of 10, 15, 20, 25 and 30 stocks.
+```{r}
+thirtyport= as.character(dowsymbolist)
+fiveport=as.character(sample(dowsymbolist,5))
+newpop=thirtyport[!(thirtyport%in%fiveport)]
+tenport=c(fiveport,as.character(sample(newpop,5)))
+newpop1=thirtyport[!(thirtyport%in%tenport)]
+fifteenport=c(tenport,as.character(sample(newpop1,5)))
+newpop2=thirtyport[!(thirtyport%in%fifteenport)]
+twentyport=c(fifteenport,as.character(sample(newpop2,5)))
+newpop3=thirtyport[!(thirtyport%in%twentyport)]
+twentyfiveport=c(twentyport,as.character(sample(newpop3,5)))
+
+fiveport
+tenport
+fifteenport
+twentyport
+twentyfiveport
+thirtyport
+```
+5. Assume that the assume stock premium is explained by the SURE CAPM model without the intercept and with Gaussian errors.
+```{r}
+portlist=list(fiveport, tenport, fifteenport,twentyport, twentyfiveport, thirtyport)
+
+capmfmls=vector()
+g=length(portlist)
+for (i in 1:g)
+{
+  fmls=vector()
+  fmls=lapply(portlist[i], function(i) paste0("prm",i,"~prmsp500-1"))
+  assign(paste0("capmls",i*5),fmls[[1]])
+}
+  
+```
+6. Now for each portfolio, use the default training sample prior. Comment on the prior in the case of the SURE model with 15 assets.
+```{r}
+capmlslist=list(capmls5, capmls10, capmls15, capmls20, capmls25, capmls30)
+c=length(capmlslist)
+for (f in 1:c)
+{
+  priorls=vector()
+  plist=lapply(capmlslist[[f]], function(f) as.formula(f))
+  priorls=trainpriorsureg(modelfrmls = plist,data = datadf, trainpct = .25)
+  assign(paste0("priorlsport",f*5),priorls)
+} 
+summary(priorlsport15)
+print("beta0_ is a 15 by 1 matrix summarizing the mean return for the fifteen stocks in the portfolio in the prior")
+priorlsport15$beta0_
+print("B0_ is a 15 by 15 matrix summarizing variance/covariance between the fifteen stocks in the portfolio in the prior")
+head(priorlsport15$B0_)
+print("rho is a parameter controlling the tightness of the prior")
+priorlsport15$rho
+print("Sigma0_ is a 15 by 15 matrix summarizing the means of the error term Sigma0 between the fifteen stocks")
+head(priorlsport15$Sigma0_)
+
+```
+7. Now compute the optimal portfolios for each of the groups of assets at the target portfolio return level. Give the weights of each asset in each portfolio as well as the standard deviation of the optimal portfolios.
+```{r}
+capmlslist=list(capmls5, capmls10, capmls15, capmls20, capmls25, capmls30)
+priorlslist=list(priorlsport5,priorlsport10, priorlsport15,priorlsport20, priorlsport25, priorlsport30)
+c=length(capmlslist)
+for (g in 1:c)
+{
+  capmportls=vector()
+  plist=lapply(capmlslist[[g]], function(g) as.formula(g, env=globalenv()))
+  capmportls = makebayesportfolioaftersureg(portmean = desr,modelfrmls = plist,
+  data = datadf, trainprior = FALSE, beta0_ = priorlslist[[g]]$beta0_, 
+  B0_ = priorlslist[[g]]$B0_, rho=priorlslist[[g]]$rho, 
+  Sigma0_ = priorlslist[[g]]$Sigma0_)
+  assign(paste0("capmportls",g*5),capmportls)
+  mat=as.matrix(capmportls$weights)
+  cat("For the",g*5,"asset portfolio, the weights for each asset are\n")
+  print(mat)
+  cat("and the portfolio standard deviation is",unlist(capmportls$portsd)," \n")
+}
+
+```
+8. Use ggplot to plot the standard deviation vs. the number of stocks in the assets.
+Comment on your findings.
+```{r}
+noofstocks=c(length(capmls5), length(capmls10), length(capmls15), length(capmls20), length(capmls25),length(capmls30))
+sdport=c(capmportls5$portsd,capmportls10$portsd,capmportls15$portsd,capmportls20$portsd,capmportls25$portsd,capmportls30$portsd)
+
+plot(noofstocks,sdport,type="l")
+
+```
